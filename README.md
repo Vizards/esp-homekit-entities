@@ -6,8 +6,8 @@
 ## Current entities
 
 - [x] Door with an angle sensor
-- [ ] Window with an angle sendor and a rain sensor
-- [ ] DoorBell with a electronic lock
+- [ ] Window with an angle sensor and a rain sensor
+- [ ] Lock with an electronic doorbell
 
 ## Build instructions
 
