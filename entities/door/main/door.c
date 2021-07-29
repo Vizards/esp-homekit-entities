@@ -1,4 +1,3 @@
-// 压力传感器目前认为变大是想打开，变小是想关上，压力阈值在 100
 // 角度传感器小于 2300 认为已经完全打开，大于 3100 认为已经完全关上
 
 #include <stdio.h>
@@ -41,7 +40,6 @@ const int close_gpio = 14;
 const int sensor_vin = 5;
 static const adc_atten_t atten = ADC_ATTEN_11db; // 满量程为3.9v
 static const adc_channel_t channel_angle = ADC_CHANNEL_6; // GPIO34
-uint32_t previous_force_number = 0;
 bool is_opening_or_closing = false;
 bool is_processing_homekit_instruction = false;
 void on_wifi_ready();
@@ -313,8 +311,8 @@ void update_state_init() {
     vTaskSuspend(updateStateTask);
 }
 
-void window_covering_identify(homekit_value_t _value) {
-    printf("Curtain identify\n");
+void door_identify(homekit_value_t _value) {
+    printf("Door identify\n");
 }
 
 void on_update_target_position(homekit_characteristic_t *ch, homekit_value_t value, void *context);
@@ -346,7 +344,7 @@ homekit_accessory_t *accessories[] = {
             HOMEKIT_CHARACTERISTIC(SERIAL_NUMBER, "001"),
             HOMEKIT_CHARACTERISTIC(MODEL, "MyDoor"),
             HOMEKIT_CHARACTERISTIC(FIRMWARE_REVISION, "0.1"),
-            HOMEKIT_CHARACTERISTIC(IDENTIFY, window_covering_identify),
+            HOMEKIT_CHARACTERISTIC(IDENTIFY, door_identify),
             NULL
         }),
         HOMEKIT_SERVICE(DOOR, .primary=true, .characteristics=(homekit_characteristic_t*[]) {
