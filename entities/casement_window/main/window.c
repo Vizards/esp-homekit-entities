@@ -27,8 +27,8 @@
 #define OBSTRUCTION_DETECTED true
 #define OBSTRUCTION_NOT_DETECTED false
 
-#define ANGLE_SENSOR_MAX_VALUE 3100
-#define ANGLE_SENSOR_MIN_VALUE 2400
+#define ANGLE_SENSOR_MAX_VALUE 1950
+#define ANGLE_SENSOR_MIN_VALUE 1000
 
 TaskHandle_t updateStateTask;
 homekit_characteristic_t current_position;
@@ -117,6 +117,7 @@ int get_window_ratio() {
     }
 
     adc_reading = filter_buf[(FILTER_N - 1) / 2];
+    printf("adc_reading: %d\n", adc_reading);
     if (adc_reading > ANGLE_SENSOR_MAX_VALUE) {
         angle_ratio = 0;
     } else if (adc_reading < ANGLE_SENSOR_MIN_VALUE) {
@@ -155,10 +156,6 @@ void open_window(uint32_t target_position) {
         current_window_ratio = get_window_ratio();
         if (current_window_ratio >= target_position) {
             printf("已经打开到指定位置\n");
-            if (target_position == 100) {
-                printf("多运行一会儿以保证开到位\n");
-                vTaskDelay(200);
-            }
             break;
         }
         if (current_window_ratio < target_position) {
@@ -294,17 +291,23 @@ void update_sensor_state() {
         printf("关窗传感器回传信号：%d\n", gpio_level_sensor_close);
 
         printf("上报雨滴传感器数据\n");
-        rain_detected.value.bool_value = gpio_level_sensor_rain == 0 ? true : false;
-        homekit_characteristic_notify(&rain_detected, rain_detected.value);
+        bool is_raining = gpio_level_sensor_rain == 0 ? true : false;
+        rain_detected.value.bool_value = is_raining;
+        if (current_position.value.int_value > 0 && is_raining == true) {
+            homekit_characteristic_notify(&rain_detected, rain_detected.value);
+        }
+        if (is_raining == false) {
+            homekit_characteristic_notify(&rain_detected, rain_detected.value);
+        }
 
-        printf("自动处理开关窗逻辑\n");
-        if (gpio_level_sensor_rain == 0 || gpio_level_sensor_close == 0) {
+        printf("处理手动开关窗逻辑\n");
+        if (gpio_level_sensor_close == 0) {
             close_window(0);
         }
         if (gpio_level_sensor_open == 0) {
             open_window(100);
         }
-        vTaskDelay(200);
+        vTaskDelay(100);
     }
 }
 
@@ -348,7 +351,7 @@ homekit_accessory_t *accessories[] = {
         HOMEKIT_SERVICE(ACCESSORY_INFORMATION, .characteristics=(homekit_characteristic_t*[]) {
             HOMEKIT_CHARACTERISTIC(NAME, "Window"),
             HOMEKIT_CHARACTERISTIC(MANUFACTURER, "MNK"),
-            HOMEKIT_CHARACTERISTIC(SERIAL_NUMBER, "001"),
+            HOMEKIT_CHARACTERISTIC(SERIAL_NUMBER, "002"),
             HOMEKIT_CHARACTERISTIC(MODEL, "WindowWithRainSensor"),
             HOMEKIT_CHARACTERISTIC(FIRMWARE_REVISION, "0.1"),
             HOMEKIT_CHARACTERISTIC(IDENTIFY, window_identify),
@@ -368,7 +371,7 @@ homekit_accessory_t *accessories[] = {
         HOMEKIT_SERVICE(ACCESSORY_INFORMATION, .characteristics=(homekit_characteristic_t*[]) {
             HOMEKIT_CHARACTERISTIC(NAME, "Rain Sensor"),
             HOMEKIT_CHARACTERISTIC(MANUFACTURER, "MNK"),
-            HOMEKIT_CHARACTERISTIC(SERIAL_NUMBER, "0011"),
+            HOMEKIT_CHARACTERISTIC(SERIAL_NUMBER, "002001"),
             HOMEKIT_CHARACTERISTIC(MODEL, "WindowWithRainSensor"),
             HOMEKIT_CHARACTERISTIC(FIRMWARE_REVISION, "0.1"),
             HOMEKIT_CHARACTERISTIC(IDENTIFY, sensor_identify),
@@ -410,9 +413,6 @@ void control_init() {
     gpio_set_direction(sensor_rain_gpio, GPIO_MODE_INPUT);
     gpio_set_direction(sensor_open_gpio, GPIO_MODE_INPUT);
     gpio_set_direction(sensor_close_gpio, GPIO_MODE_INPUT);
-    gpio_set_level(sensor_rain_gpio, 1);
-    gpio_set_level(sensor_close_gpio, 1);
-    gpio_set_level(sensor_open_gpio, 1);
 
     printf("控制系统和传感器初始化完成\n");
 }
