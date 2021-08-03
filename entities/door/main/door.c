@@ -1,5 +1,3 @@
-// 角度传感器小于 2300 认为已经完全打开，大于 3100 认为已经完全关上
-
 #include <stdio.h>
 #include <esp_wifi.h>
 #include <esp_event_loop.h>
@@ -28,6 +26,9 @@
 #define POSITION_STATE_STOPPED 2
 #define OBSTRUCTION_DETECTED true
 #define OBSTRUCTION_NOT_DETECTED false
+
+#define ANGLE_SENSOR_MAX_VALUE 3100
+#define ANGLE_SENSOR_MIN_VALUE 2300
 
 TaskHandle_t updateStateTask;
 homekit_characteristic_t current_position;
@@ -89,6 +90,7 @@ static void wifi_init() {
 int get_door_ratio() {
     int angle_ratio = 0;
     int adc_reading = 0;
+    float difference_rate = 100 / ((ANGLE_SENSOR_MAX_VALUE - ANGLE_SENSOR_MIN_VALUE) / 10);
     adc1_config_width(ADC_WIDTH_BIT_12); //采集宽度
     adc1_config_channel_atten(channel_angle, atten); //配置通道 以及衰减度
 
@@ -113,12 +115,12 @@ int get_door_ratio() {
     }
 
     adc_reading = filter_buf[(FILTER_N - 1) / 2];
-    if (adc_reading > 3100) {
+    if (adc_reading > ANGLE_SENSOR_MAX_VALUE) {
         angle_ratio = 0;
-    } else if (adc_reading < 2400) {
+    } else if (adc_reading < ANGLE_SENSOR_MIN_VALUE) {
         angle_ratio = 100;
     } else {
-        angle_ratio = (3100 - adc_reading) / 10;
+        angle_ratio = (ANGLE_SENSOR_MAX_VALUE - adc_reading) * difference_rate / 10;
     }
     return angle_ratio;
 }
@@ -341,9 +343,9 @@ homekit_accessory_t *accessories[] = {
         HOMEKIT_SERVICE(ACCESSORY_INFORMATION, .characteristics=(homekit_characteristic_t*[]) {
             HOMEKIT_CHARACTERISTIC(NAME, "Door"),
             HOMEKIT_CHARACTERISTIC(MANUFACTURER, "MNK"),
-            HOMEKIT_CHARACTERISTIC(SERIAL_NUMBER, "001"),
-            HOMEKIT_CHARACTERISTIC(MODEL, "MyDoor"),
-            HOMEKIT_CHARACTERISTIC(FIRMWARE_REVISION, "0.1"),
+            HOMEKIT_CHARACTERISTIC(SERIAL_NUMBER, "ESP32BR01DR01"),
+            HOMEKIT_CHARACTERISTIC(MODEL, "LightWoodDoor"),
+            HOMEKIT_CHARACTERISTIC(FIRMWARE_REVISION, "0.0.1"),
             HOMEKIT_CHARACTERISTIC(IDENTIFY, door_identify),
             NULL
         }),

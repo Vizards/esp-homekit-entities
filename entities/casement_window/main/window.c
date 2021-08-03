@@ -45,7 +45,6 @@ const int sensor_close_gpio = 33;
 static const adc_atten_t atten = ADC_ATTEN_11db; // 满量程为3.9v
 static const adc_channel_t channel_angle = ADC_CHANNEL_6; // GPIO34
 bool is_opening_or_closing = false;
-bool is_processing_homekit_instruction = false;
 void on_wifi_ready();
 
 esp_err_t event_handler(void *ctx, system_event_t *event)
@@ -93,6 +92,7 @@ static void wifi_init() {
 int get_window_ratio() {
     int angle_ratio = 0;
     int adc_reading = 0;
+    float difference_rate = 100 / ((ANGLE_SENSOR_MAX_VALUE - ANGLE_SENSOR_MIN_VALUE) / 10);
     adc1_config_width(ADC_WIDTH_BIT_12); //采集宽度
     adc1_config_channel_atten(channel_angle, atten); //配置通道 以及衰减度
 
@@ -117,13 +117,12 @@ int get_window_ratio() {
     }
 
     adc_reading = filter_buf[(FILTER_N - 1) / 2];
-    printf("adc_reading: %d\n", adc_reading);
     if (adc_reading > ANGLE_SENSOR_MAX_VALUE) {
         angle_ratio = 0;
     } else if (adc_reading < ANGLE_SENSOR_MIN_VALUE) {
         angle_ratio = 100;
     } else {
-        angle_ratio = (ANGLE_SENSOR_MAX_VALUE - adc_reading) / 10;
+        angle_ratio = (ANGLE_SENSOR_MAX_VALUE - adc_reading) * difference_rate / 10;
     }
     return angle_ratio;
 }
@@ -264,7 +263,6 @@ void close_window(int target_position) {
 // 监听 HomeKit 事件，不需要一直监听
 void update_state() {
     while (true) {        
-        is_processing_homekit_instruction = true;
         printf("当前位置: %u\n", current_position.value.int_value);
         printf("目标位置: %u\n", target_position.value.int_value);
         if (target_position.value.int_value - current_position.value.int_value >= 10) {
@@ -273,7 +271,6 @@ void update_state() {
         if (target_position.value.int_value - current_position.value.int_value <= -10) {
             close_window(target_position.value.int_value);
         }
-        is_processing_homekit_instruction = false;
         vTaskSuspend(updateStateTask);
     }
 }
@@ -351,9 +348,9 @@ homekit_accessory_t *accessories[] = {
         HOMEKIT_SERVICE(ACCESSORY_INFORMATION, .characteristics=(homekit_characteristic_t*[]) {
             HOMEKIT_CHARACTERISTIC(NAME, "Window"),
             HOMEKIT_CHARACTERISTIC(MANUFACTURER, "MNK"),
-            HOMEKIT_CHARACTERISTIC(SERIAL_NUMBER, "002"),
-            HOMEKIT_CHARACTERISTIC(MODEL, "WindowWithRainSensor"),
-            HOMEKIT_CHARACTERISTIC(FIRMWARE_REVISION, "0.1"),
+            HOMEKIT_CHARACTERISTIC(SERIAL_NUMBER, "ESP32BR01CW01"),
+            HOMEKIT_CHARACTERISTIC(MODEL, "CasementWindow"),
+            HOMEKIT_CHARACTERISTIC(FIRMWARE_REVISION, "0.0.1"),
             HOMEKIT_CHARACTERISTIC(IDENTIFY, window_identify),
             NULL
         }),
@@ -371,9 +368,9 @@ homekit_accessory_t *accessories[] = {
         HOMEKIT_SERVICE(ACCESSORY_INFORMATION, .characteristics=(homekit_characteristic_t*[]) {
             HOMEKIT_CHARACTERISTIC(NAME, "Rain Sensor"),
             HOMEKIT_CHARACTERISTIC(MANUFACTURER, "MNK"),
-            HOMEKIT_CHARACTERISTIC(SERIAL_NUMBER, "002001"),
-            HOMEKIT_CHARACTERISTIC(MODEL, "WindowWithRainSensor"),
-            HOMEKIT_CHARACTERISTIC(FIRMWARE_REVISION, "0.1"),
+            HOMEKIT_CHARACTERISTIC(SERIAL_NUMBER, "ESP32BR01RS01"),
+            HOMEKIT_CHARACTERISTIC(MODEL, "RainSensor"),
+            HOMEKIT_CHARACTERISTIC(FIRMWARE_REVISION, "0.0.1"),
             HOMEKIT_CHARACTERISTIC(IDENTIFY, sensor_identify),
             NULL
         }),
