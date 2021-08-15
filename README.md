@@ -7,8 +7,8 @@
 
 - [x] Door with an angle sensor
 - [x] Casement window with an angle sensor and a rain sensor
+- [x] Lock with an electronic doorbell
 - [ ] Sliding window with a distance sensor
-- [ ] Lock with an electronic doorbell
 
 ## Build instructions
 

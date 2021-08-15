@@ -23,6 +23,7 @@ typedef enum {
 } lock_state_t;
 homekit_characteristic_t lock_current_state;
 homekit_characteristic_t lock_target_state;
+homekit_characteristic_t switch_on;
 TaskHandle_t updateStateTask;
 const int doorbell_gpio = 33;
 const int lock_gpio = 32;
@@ -103,28 +104,6 @@ static void wifi_init() {
     ESP_ERROR_CHECK(esp_wifi_start());
 };
 
-
-void update_doorbell_state() {
-    while (true){
-        int gpio_level_doorbell = gpio_get_level(doorbell_gpio);
-        if (gpio_level_doorbell == 1) {
-            esp_http_client_config_t config = {
-                .url = homebridge_camera_doorbell_trigger_url,
-                .event_handler = _http_event_handle,
-            };
-            esp_http_client_handle_t client = esp_http_client_init(&config);
-            esp_err_t err = esp_http_client_perform(client);
-            if (err == ESP_OK) {
-                printf("Status = %d, content_length = %d\n",
-                    esp_http_client_get_status_code(client),
-                    esp_http_client_get_content_length(client));
-            }
-            esp_http_client_cleanup(client);
-            vTaskDelay(100);
-        }
-    }
-}
-
 void lock_lock() {
     lock_current_state.value = HOMEKIT_UINT8(lock_state_secured);
     homekit_characteristic_notify(&lock_current_state, lock_current_state.value);
@@ -137,14 +116,50 @@ void lock_unlock() {
     gpio_set_level(lock_gpio, 1);
     lock_current_state.value = HOMEKIT_UINT8(lock_state_unsecured);
     homekit_characteristic_notify(&lock_current_state, lock_current_state.value);
+    vTaskDelay(500 / portTICK_PERIOD_MS);
+    gpio_set_level(lock_gpio, 0);
+    vTaskDelay(2500 / portTICK_PERIOD_MS);
 
-    vTaskDelay(3000 / portTICK_PERIOD_MS);
     lock_target_state.value = HOMEKIT_UINT8(lock_state_secured);
     lock_current_state.value = HOMEKIT_UINT8(lock_state_secured);
     homekit_characteristic_notify(&lock_target_state, lock_target_state.value);
     homekit_characteristic_notify(&lock_current_state, lock_current_state.value);
     vTaskDelete(NULL);
 };
+
+void update_doorbell_state() {
+    while (true){
+        int gpio_level_doorbell_is_high_times = 0;
+        for (int i = 0; i < 10; i++) {
+            int gpio_level_doorbell = gpio_get_level(doorbell_gpio);
+            if (gpio_level_doorbell == 1) {
+                gpio_level_doorbell_is_high_times++;
+            }
+        }
+        if (gpio_level_doorbell_is_high_times == 10) {
+            if (switch_on.value.bool_value == true) {
+                xTaskCreate(lock_unlock, 'LockUnlock', 4096, NULL, 5, NULL);
+                switch_on.value.bool_value = false;
+                homekit_characteristic_notify(&switch_on, switch_on.value);
+            }
+            esp_http_client_config_t config = {
+                .url = homebridge_camera_doorbell_trigger_url,
+                .event_handler = _http_event_handle,
+            };
+            esp_http_client_handle_t client = esp_http_client_init(&config);
+            esp_err_t err = esp_http_client_perform(client);
+            if (err == ESP_OK) {
+                printf("Status = %d, content_length = %d\n",
+                    esp_http_client_get_status_code(client),
+                    esp_http_client_get_content_length(client));
+            }
+            esp_http_client_cleanup(client);
+            printf("触发门铃后，延迟 3s 再检测，防止过于频繁发送门铃通知");
+            vTaskDelay(3000 / portTICK_PERIOD_MS);
+        }
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+    }
+}
 
 void lock_target_state_setter(homekit_value_t value) {
     lock_target_state.value = value;
@@ -154,21 +169,29 @@ void lock_target_state_setter(homekit_value_t value) {
         xTaskCreate(lock_lock, 'LockLock', 4096, NULL, 5, NULL);
     }
 };
+void switch_on_callback(homekit_characteristic_t *_ch, homekit_value_t on, void *context) {};
+
 void lock_identify(homekit_value_t _value) {
     printf("Lock identify\n");
 };
 void lock_control_point(homekit_value_t value) {
     printf("Lock control point setter\n");
 };
+void lock_switch_identify(homekit_value_t _value) {
+    printf("Lock Switch identify\n");
+};
+
 homekit_characteristic_t lock_current_state = HOMEKIT_CHARACTERISTIC_(
     LOCK_CURRENT_STATE,
-    lock_state_unknown,
+    lock_state_secured,
 );
 homekit_characteristic_t lock_target_state = HOMEKIT_CHARACTERISTIC_(
     LOCK_TARGET_STATE,
     lock_state_secured,
     .setter=lock_target_state_setter,
 );
+homekit_characteristic_t switch_on = HOMEKIT_CHARACTERISTIC_(ON, false, .callback=HOMEKIT_CHARACTERISTIC_CALLBACK(switch_on_callback));
+
 homekit_accessory_t *accessories[] = {
     HOMEKIT_ACCESSORY(.id=1, .category=homekit_accessory_category_door_lock, .services=(homekit_service_t*[]) {
         HOMEKIT_SERVICE(ACCESSORY_INFORMATION, .characteristics=(homekit_characteristic_t*[]) {
@@ -191,6 +214,23 @@ homekit_accessory_t *accessories[] = {
                 .setter=lock_control_point
             ),
             HOMEKIT_CHARACTERISTIC(VERSION, "0.0.1"),
+            NULL
+        }),
+        NULL
+    }),
+    HOMEKIT_ACCESSORY(.id=2, .category=homekit_accessory_category_switch, .services=(homekit_service_t*[]) {
+        HOMEKIT_SERVICE(ACCESSORY_INFORMATION, .characteristics=(homekit_characteristic_t*[]) {
+            HOMEKIT_CHARACTERISTIC(NAME, "Lock Auto Switch"),
+            HOMEKIT_CHARACTERISTIC(MANUFACTURER, "MNK"),
+            HOMEKIT_CHARACTERISTIC(SERIAL_NUMBER, "ESP32ET01ST01"),
+            HOMEKIT_CHARACTERISTIC(MODEL, "LockWithDoorbell"),
+            HOMEKIT_CHARACTERISTIC(FIRMWARE_REVISION, "0.0.1"),
+            HOMEKIT_CHARACTERISTIC(IDENTIFY, lock_switch_identify),
+            NULL
+        }),
+        HOMEKIT_SERVICE(SWITCH, .primary=true, .characteristics=(homekit_characteristic_t*[]){
+            HOMEKIT_CHARACTERISTIC(NAME, "Lock Auto Switch"),
+            &switch_on,
             NULL
         }),
         NULL
