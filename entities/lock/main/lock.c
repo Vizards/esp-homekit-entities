@@ -216,18 +216,6 @@ homekit_accessory_t *accessories[] = {
             HOMEKIT_CHARACTERISTIC(VERSION, "0.0.1"),
             NULL
         }),
-        NULL
-    }),
-    HOMEKIT_ACCESSORY(.id=2, .category=homekit_accessory_category_switch, .services=(homekit_service_t*[]) {
-        HOMEKIT_SERVICE(ACCESSORY_INFORMATION, .characteristics=(homekit_characteristic_t*[]) {
-            HOMEKIT_CHARACTERISTIC(NAME, "Lock Auto Switch"),
-            HOMEKIT_CHARACTERISTIC(MANUFACTURER, "MNK"),
-            HOMEKIT_CHARACTERISTIC(SERIAL_NUMBER, "ESP32ET01ST01"),
-            HOMEKIT_CHARACTERISTIC(MODEL, "LockWithDoorbell"),
-            HOMEKIT_CHARACTERISTIC(FIRMWARE_REVISION, "0.0.1"),
-            HOMEKIT_CHARACTERISTIC(IDENTIFY, lock_switch_identify),
-            NULL
-        }),
         HOMEKIT_SERVICE(SWITCH, .primary=true, .characteristics=(homekit_characteristic_t*[]){
             HOMEKIT_CHARACTERISTIC(NAME, "Lock Auto Switch"),
             &switch_on,

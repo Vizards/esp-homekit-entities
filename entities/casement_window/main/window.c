@@ -373,18 +373,6 @@ homekit_accessory_t *accessories[] = {
             &obstruction_detected,
             NULL
         }),
-        NULL
-    }),
-    HOMEKIT_ACCESSORY(.id=2, .category=homekit_accessory_category_sensor, .services=(homekit_service_t*[]) {
-        HOMEKIT_SERVICE(ACCESSORY_INFORMATION, .characteristics=(homekit_characteristic_t*[]) {
-            HOMEKIT_CHARACTERISTIC(NAME, "Rain Sensor"),
-            HOMEKIT_CHARACTERISTIC(MANUFACTURER, "MNK"),
-            HOMEKIT_CHARACTERISTIC(SERIAL_NUMBER, "ESP32BR01RS01"),
-            HOMEKIT_CHARACTERISTIC(MODEL, "RainSensor"),
-            HOMEKIT_CHARACTERISTIC(FIRMWARE_REVISION, "0.0.1"),
-            HOMEKIT_CHARACTERISTIC(IDENTIFY, sensor_identify),
-            NULL
-        }),
         HOMEKIT_SERVICE(LEAK_SENSOR, .primary=true, .characteristics=(homekit_characteristic_t*[]) {
             HOMEKIT_CHARACTERISTIC(NAME, "Rain Sensor"),
             &rain_detected,
