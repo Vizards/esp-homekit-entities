@@ -281,19 +281,25 @@ void update_sensor_state() {
     while (true) {
         int gpio_level_sensor_open_is_zero_times = 0;
         int gpio_level_sensor_close_is_zero_times = 0;
+        int gpio_level_sensor_rain_is_zero_times = 0;
         // Sometimes a physical button returns a low level singal(even if it has not been triggered). Only god knows why.
         for (int i = 0; i < 6; i++) {
             int gpio_level_sensor_open = gpio_get_level(sensor_open_gpio);
             int gpio_level_sensor_close = gpio_get_level(sensor_close_gpio);
+            int gpio_level_sensor_rain = gpio_get_level(sensor_rain_gpio);
             if (gpio_level_sensor_open == 0) {
                 gpio_level_sensor_open_is_zero_times++;
             }
             if (gpio_level_sensor_close == 0) {
                 gpio_level_sensor_close_is_zero_times++;
             }
+            if (gpio_level_sensor_rain == 0) {
+                gpio_level_sensor_rain_is_zero_times++;
+            }
         }
         printf("开窗传感器回传信号为0的次数：%d\n", gpio_level_sensor_open_is_zero_times);
         printf("关窗传感器回传信号为0的次数：%d\n", gpio_level_sensor_close_is_zero_times);
+        printf("雨滴传感器回传信号为0的次数：%d\n", gpio_level_sensor_rain_is_zero_times);
         if (gpio_level_sensor_close_is_zero_times == 6) {
             target_position.value.int_value = 0;
             homekit_characteristic_notify(&target_position, target_position.value);
@@ -306,16 +312,15 @@ void update_sensor_state() {
             printf("处理手动开窗逻辑\n");
             open_window(100);
         }
-        
-        int gpio_level_sensor_rain = gpio_get_level(sensor_rain_gpio);
-        printf("雨滴传感器回传信号：%d\n", gpio_level_sensor_rain);
-        bool is_raining = gpio_level_sensor_rain == 0 ? true : false;
-        rain_detected.value.bool_value = is_raining;
-        if ((current_position.value.int_value > 0 && is_raining == true) || is_raining == false) {
-            printf("上报雨滴传感器数据\n");
-            homekit_characteristic_notify(&rain_detected, rain_detected.value);
+        printf("上报雨滴传感器数据\n");
+        if (gpio_level_sensor_rain_is_zero_times == 6 && current_position.value.int_value > 0) {
+            printf("当前检测到雨水，且窗户处于开启状态 \n");
+            rain_detected.value.bool_value = true;
+        } else {
+            rain_detected.value.bool_value = false;
         }
-        vTaskDelay(100);
+        homekit_characteristic_notify(&rain_detected, rain_detected.value);
+        vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 }
 
