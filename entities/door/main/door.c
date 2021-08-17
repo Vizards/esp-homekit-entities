@@ -125,8 +125,8 @@ int get_door_ratio() {
     return angle_ratio;
 }
 
-void open_door(uint32_t target_position) {
-    printf("接收到开门处理信号，目标位置：%d\n", target_position);
+void open_door(uint32_t _target_position) {
+    printf("接收到开门处理信号，目标位置：%d\n", _target_position);
     if (is_opening_or_closing == true) {
         printf("当前正在开门或关门，不接受重复命令\n");
         return;
@@ -145,21 +145,23 @@ void open_door(uint32_t target_position) {
     gpio_set_level(open_gpio, 1);
     
     printf("通知 HOMEKIT 更新为开启中状态\n");
+    target_position.value.int_value = _target_position;
+    homekit_characteristic_notify(&target_position, target_position.value);
     position_state.value.int_value = POSITION_STATE_OPENING;
     homekit_characteristic_notify(&position_state, position_state.value);
     
     printf(".......等待角度传感器回传位置信号.....\n");
     while(1) {
         current_door_ratio = get_door_ratio();
-        if (current_door_ratio >= target_position) {
+        if (current_door_ratio >= _target_position) {
             printf("已经打开到指定位置\n");
-            if (target_position == 100) {
+            if (_target_position == 100) {
                 printf("多运行一会儿以保证开到位\n");
                 vTaskDelay(200);
             }
             break;
         }
-        if (current_door_ratio < target_position) {
+        if (current_door_ratio < _target_position) {
             printf("正在打开中\n");
             if (current_door_ratio - last_current_door_ratio < 10) {
                 the_times_that_current_position_equal_to_last_position++;
@@ -193,8 +195,8 @@ void open_door(uint32_t target_position) {
     printf("开门操作全部结束\n");
 }
 
-void close_door(int target_position) {
-    printf("接收到关门处理信号，目标位置 %d\n", target_position);
+void close_door(int _target_position) {
+    printf("接收到关门处理信号，目标位置 %d\n", _target_position);
     if (is_opening_or_closing == true) {
         printf("当前正在开门或关门，不接受重复命令\n");
         return;
@@ -214,21 +216,23 @@ void close_door(int target_position) {
     gpio_set_level(close_gpio, 1);
     
     printf("通知 HOMEKIT 更新为关闭中状态\n");
+    target_position.value.int_value = _target_position;
+    homekit_characteristic_notify(&target_position, target_position.value);
     position_state.value.int_value = POSITION_STATE_CLOSING;
     homekit_characteristic_notify(&position_state, position_state.value);
 
     printf(".......等待角度传感器回传位置信号.....\n");
     while(1) {
         current_door_ratio = get_door_ratio();
-        if (current_door_ratio - target_position < 8) {
+        if (current_door_ratio - _target_position < 8) {
             printf("已经关闭到指定位置\n");
-            if (target_position == 0) {
+            if (_target_position == 0) {
                 printf("多运行一会儿以保证关到位\n");
                 vTaskDelay(200);
             }
             break;
         }
-        if (current_door_ratio > target_position) {
+        if (current_door_ratio > _target_position) {
             printf("正在关闭中\n");
             if (last_current_door_ratio - current_door_ratio < 10) {
                 the_times_that_current_position_equal_to_last_position++;
@@ -254,7 +258,7 @@ void close_door(int target_position) {
     printf("通知 HOMEKIT 更新为停止状态\n");
     position_state.value.int_value = POSITION_STATE_STOPPED;
     homekit_characteristic_notify(&position_state, position_state.value);
-    current_position.value.int_value = target_position;
+    current_position.value.int_value = _target_position;
     homekit_characteristic_notify(&current_position, current_position.value);
 
     vTaskDelay(100);
